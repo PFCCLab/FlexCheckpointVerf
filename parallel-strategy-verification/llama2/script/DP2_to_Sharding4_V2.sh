@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#跑shardingV2的时候用：--sharding_parallel_config "split_param" \
 
 # 设置环境变量
 export PYTHONPATH=../:$PYTHONPATH
@@ -9,10 +10,10 @@ export FLAGS_cudnn_deterministic=True
 export FLAGS_embedding_deterministic=1 
 
 
-ROOT_DIR="/home/paddlenlp/llm"
+ROOT_DIR="/home/aistudio/PaddleNLP/llm"
 
 # 转换前训练
-task_name="DP2_to_DP4"
+task_name="DP2_to_Sharding4_V2"
 # 从task_name中提取TP2和TP4作为曲线名称
 curve_name1=$(echo $task_name | cut -d'_' -f1)  # 提取TP2
 curve_name2=$(echo $task_name | cut -d'_' -f3)  # 提取TP4
@@ -24,7 +25,7 @@ case_temp0_log_dir="${ROOT_DIR}/temp0/${task_name}_log"
 rm -rf $case_temp0_out_dir
 rm -rf $case_temp0_log_dir
 
-# train dp2
+# train 
 python -u -m paddle.distributed.launch \
     --gpus "0,1" \
     --log_dir "$case_temp0_log_dir" \
@@ -49,8 +50,8 @@ python -u -m paddle.distributed.launch \
     --enable_linear_fused_grad_add 0 \
     --learning_rate 3e-05 \
     --logging_steps 1 \
-    --max_steps 51 \
-    --save_steps 50 \
+    --max_steps 6 \
+    --save_steps 5 \
     --eval_steps 1000 \
     --weight_decay 0.01 \
     --fp16 1 \
@@ -77,7 +78,7 @@ python -u -m paddle.distributed.launch \
 export FLAGS_shard_bypass_dygraph_optimizer=1
 
 
-# 从转换前训练load to dp4
+# 从转换前训练load
 case_temp1_out_dir="${ROOT_DIR}/temp1/${task_name}"
 case_temp1_log_dir="${ROOT_DIR}/temp1/${task_name}_log"
 
@@ -85,7 +86,7 @@ case_temp1_log_dir="${ROOT_DIR}/temp1/${task_name}_log"
 rm -rf $case_temp1_out_dir
 rm -rf $case_temp1_log_dir
 
-# load to dp4 from dp2
+
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "$case_temp1_log_dir" \
@@ -97,6 +98,9 @@ python -u -m paddle.distributed.launch \
     --num_hidden_layers 4 \
     --output_dir "$case_temp1_out_dir" \
     --per_device_train_batch_size 1 \
+    --sharding_parallel_degree 4 \
+    --sharding "stage1" \
+    --sharding_parallel_config "split_param" \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
@@ -110,8 +114,8 @@ python -u -m paddle.distributed.launch \
     --enable_linear_fused_grad_add 0 \
     --learning_rate 3e-05 \
     --logging_steps 1 \
-    --max_steps 51 \
-    --save_steps 51 \
+    --max_steps 6 \
+    --save_steps 6 \
     --eval_steps 1000 \
     --weight_decay 0.01 \
     --fp16 1 \
@@ -133,10 +137,10 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-50"
+    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-5"
 
 
-# 从dp4再load回dp2
+# load回
 case_temp2_out_dir="${ROOT_DIR}/temp2/${task_name}"
 case_temp2_log_dir="${ROOT_DIR}/temp2/${task_name}_log"
 
@@ -144,7 +148,6 @@ case_temp2_log_dir="${ROOT_DIR}/temp2/${task_name}_log"
 rm -rf $case_temp2_out_dir
 rm -rf $case_temp2_log_dir
 
-# load to dp4 from dp2
 python -u -m paddle.distributed.launch \
     --gpus "0,1" \
     --log_dir "$case_temp2_log_dir" \
@@ -169,8 +172,8 @@ python -u -m paddle.distributed.launch \
     --enable_linear_fused_grad_add 0 \
     --learning_rate 3e-05 \
     --logging_steps 1 \
-    --max_steps 52 \
-    --save_steps 52 \
+    --max_steps 7 \
+    --save_steps 7 \
     --eval_steps 1000 \
     --weight_decay 0.01 \
     --fp16 1 \
@@ -192,15 +195,15 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    --resume_from_checkpoint "${case_temp1_out_dir}/checkpoint-51"
+    --resume_from_checkpoint "${case_temp1_out_dir}/checkpoint-6"
 
-#比较转换前，后转换回来的tp2的ckpt的md5是否完全一致，若完全一致，则会输出：MD5匹配通过
-python -m compare_checkpoints temp2/${task_name}/checkpoint-52 temp0/${task_name}/checkpoint-50
-
-
+#比较转换前，后转换回来的ckpt的md5是否完全一致，若完全一致，则会输出：MD5匹配通过
+python -m compare_checkpoints temp2/${task_name}/checkpoint-7 temp0/${task_name}/checkpoint-5
 
 
-# load dp2 to dp4,to train
+
+
+# load to train
 
 export FLAGS_shard_bypass_dygraph_optimizer=0
 
@@ -211,7 +214,6 @@ case_temp3_log_dir="${ROOT_DIR}/temp3/${task_name}_log"
 rm -rf $case_temp3_out_dir
 rm -rf $case_temp3_log_dir
 
-# load to dp4 from dp2
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "$case_temp3_log_dir" \
@@ -225,6 +227,9 @@ python -u -m paddle.distributed.launch \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
+    --sharding_parallel_degree 4 \
+    --sharding "stage1" \
+    --sharding_parallel_config "split_param" \
     --tensor_parallel_degree 1 \
     --pipeline_parallel_degree 1 \
     --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity" \
@@ -236,8 +241,8 @@ python -u -m paddle.distributed.launch \
     --enable_linear_fused_grad_add 0 \
     --learning_rate 3e-05 \
     --logging_steps 1 \
-    --max_steps 200 \
-    --save_steps 201 \
+    --max_steps 10 \
+    --save_steps 11 \
     --eval_steps 1000 \
     --weight_decay 0.01 \
     --fp16 1 \
@@ -259,7 +264,7 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-50"
+    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-5"
 
 # 计算续训的 loss diff 精度误差
 python -m coculate_loss_with_md5 ${case_temp0_log_dir}/workerlog.0 ${case_temp3_log_dir}/workerlog.0 

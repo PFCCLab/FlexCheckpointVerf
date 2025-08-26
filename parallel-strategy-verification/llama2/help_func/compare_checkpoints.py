@@ -12,6 +12,7 @@ import glob
 from pathlib import Path
 from typing import Dict, List
 import sys
+import numpy as np
 
 
 def get_distcp_files(folder_path: str) -> List[str]:
@@ -46,8 +47,14 @@ def get_md5_sum(tensor) -> str:
     获取 tensor 的 MD5 值
     """
     try:
+        # 若为 numpy.ndarray，先转为 paddle.Tensor
+        if isinstance(tensor, np.ndarray):
+            tensor = paddle.to_tensor(tensor)
+        # 其他非 Tensor 类型直接返回 None
+        if not isinstance(tensor, paddle.Tensor):
+            return None
         return tensor._md5sum()
-    except AttributeError:
+    except Exception:
         return None
 
 

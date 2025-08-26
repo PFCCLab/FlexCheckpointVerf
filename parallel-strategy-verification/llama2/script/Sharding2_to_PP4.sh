@@ -1,5 +1,6 @@
 #!/bin/bash
 
+#跑shardingV2的时候用：--sharding_parallel_config "split_param" \
 
 # 设置环境变量
 export PYTHONPATH=../:$PYTHONPATH
@@ -12,7 +13,7 @@ export FLAGS_embedding_deterministic=1
 ROOT_DIR="/home/paddlenlp/llm"
 
 # 转换前训练
-task_name="DP2_to_Sharding4"
+task_name="Sharding2_to_PP4"
 # 从task_name中提取TP2和TP4作为曲线名称
 curve_name1=$(echo $task_name | cut -d'_' -f1)  # 提取TP2
 curve_name2=$(echo $task_name | cut -d'_' -f3)  # 提取TP4
@@ -29,13 +30,13 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1" \
     --log_dir "$case_temp0_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "./llama2-7b" \
-    --tokenizer_name_or_path "./llama2-7b" \
+    --model_name_or_path "meta-llama/Llama-2-7b" \
+    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
     --num_hidden_layers 4 \
     --output_dir "$case_temp0_out_dir" \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
@@ -72,6 +73,8 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
+    --sharding_parallel_degree 2 \
+    --sharding "stage1" \
 
 
 export FLAGS_shard_bypass_dygraph_optimizer=1
@@ -90,19 +93,17 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "$case_temp1_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "./llama2-7b" \
-    --tokenizer_name_or_path "./llama2-7b" \
+    --model_name_or_path "meta-llama/Llama-2-7b" \
+    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
     --num_hidden_layers 4 \
     --output_dir "$case_temp1_out_dir" \
-    --per_device_train_batch_size 1 \
-    --sharding_parallel_degree 4 \
-    --sharding "stage1" \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
-    --pipeline_parallel_degree 1 \
+    --pipeline_parallel_degree 4 \
     --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity" \
     --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv enable_overlap_p2p_comm" \
     --virtual_pp_degree 1 \
@@ -135,7 +136,10 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-50"
+    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-50" \
+    # --sharding_parallel_degree 4 \
+    # --sharding "stage1" \
+    # --sharding_parallel_config "split_param" \
 
 
 # load回
@@ -150,13 +154,13 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1" \
     --log_dir "$case_temp2_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "./llama2-7b" \
-    --tokenizer_name_or_path "./llama2-7b" \
+    --model_name_or_path "meta-llama/Llama-2-7b" \
+    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
     --num_hidden_layers 4 \
     --output_dir "$case_temp2_out_dir" \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
@@ -193,6 +197,8 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
+    --sharding_parallel_degree 2 \
+    --sharding "stage1" \
     --resume_from_checkpoint "${case_temp1_out_dir}/checkpoint-51"
 
 #比较转换前，后转换回来的ckpt的md5是否完全一致，若完全一致，则会输出：MD5匹配通过
@@ -216,19 +222,17 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "$case_temp3_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "./llama2-7b" \
-    --tokenizer_name_or_path "./llama2-7b" \
+    --model_name_or_path "meta-llama/Llama-2-7b" \
+    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
     --num_hidden_layers 4 \
     --output_dir "$case_temp3_out_dir" \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
-    --sharding_parallel_degree 4 \
-    --sharding "stage1" \
     --tensor_parallel_degree 1 \
-    --pipeline_parallel_degree 1 \
+    --pipeline_parallel_degree 4 \
     --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity" \
     --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv enable_overlap_p2p_comm" \
     --virtual_pp_degree 1 \
@@ -261,7 +265,10 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-50"
+    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-50" \
+    # --sharding_parallel_degree 4 \
+    # --sharding "stage1" \
+    # --sharding_parallel_config "split_param" \
 
-# 绘制loss曲线
-python -m plot_loss ${case_temp0_log_dir}/workerlog.0 ${case_temp3_log_dir}/workerlog.0 ${ROOT_DIR}/output_loss_images ${task_name}.png "$curve_name1" "$curve_name2"
+# 计算续训的 loss diff 精度误差
+python -m coculate_loss_with_md5 ${case_temp0_log_dir}/workerlog.0 ${case_temp3_log_dir}/workerlog.0 
