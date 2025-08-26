@@ -16,8 +16,8 @@ loss 收敛趋势图需要用 ckpt1 训 50 个 step， load 成 ckpt 2 继续训
 |  | dp4 | sharding2 (v1) | sharding2 (v2) | sharding4 (v1) | sharding4 (v2) | tp4 | pp4 | tp2 + sharding2 (v1) | tp2 + sharding2 (v2) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | dp2 | 1E-5 |  |  | 1E-5 | 1E-4 |  | 1E-5 |  |
-| sharding2 (v1) | 1E-5 | ✅ |  | 1E-5 | 1E-4 |  | 1E-5 |  |
-| sharding2 (v2) | 1E-4 |  | ✅ | 1E-4 | 1E-4 |  | 1E-4 |  |
+| sharding2 (v1) | 1E-5 | ✅ | ✅ | 1E-5 | 1E-4 |  | 1E-5 |  |
+| sharding2 (v2) | 1E-4 | ✅ | ✅ | 1E-4 | 1E-4 |  | 1E-4 |  |
 | tp2 |  |  |  |  |  |  |  |  |
 | pp2 | 1E-5 |  |  | 1E-5 | 1E-4 |  | ✅ |  |
 | tp2 + sharding2 (v1) |  |  |  |  |  |  |  |  |

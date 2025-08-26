@@ -265,7 +265,7 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-50" \
+    --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-5" \
     --sharding_parallel_degree 4 \
     --sharding "stage1" \
     --sharding_parallel_config "split_param" \

@@ -3,7 +3,7 @@
 """
 从两个训练日志中提取信息，比较：
 1) 优先比较 loss_md5：前一个log的最后一个 vs 后一个log的第一个
-   - 若二者都存在且相等 -> 输出 0
+   - 若二者都存在且相等 -> 输出 "md5对齐"
    - 若不相等或缺失 -> 回退比较loss
 2) 回退比较 loss：前一个log的最后一个loss 与 后一个log的第一个loss 的差值精度
    - 若完全相等 -> 输出 0
@@ -74,7 +74,7 @@ def main():
 
     if md5_last_of_log1 is not None and md5_first_of_log2 is not None:
         if md5_last_of_log1 == md5_first_of_log2:
-            print(0)
+            print("md5对齐")
             return
         # 若不相等则回退到比较 loss
 
