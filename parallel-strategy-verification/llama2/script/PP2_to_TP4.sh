@@ -1,6 +1,5 @@
 #!/bin/bash
 
-#跑shardingV2的时候用：--sharding_parallel_config "split_param" \
 
 # 设置环境变量
 export PYTHONPATH=../:$PYTHONPATH
@@ -10,13 +9,13 @@ export FLAGS_cudnn_deterministic=True
 export FLAGS_embedding_deterministic=1 
 
 
-ROOT_DIR="/home/aistudio/PaddleNLP/llm"
+ROOT_DIR="/home/paddlenlp/llm"
 
 # 转换前训练
-task_name="PP2_to_Sharding4"
-# 从task_name中提取TP2和TP4作为曲线名称
-curve_name1=$(echo $task_name | cut -d'_' -f1)  # 提取TP2
-curve_name2=$(echo $task_name | cut -d'_' -f3)  # 提取TP4
+task_name="PP2_to_TP4"
+
+curve_name1=$(echo $task_name | cut -d'_' -f1)  
+curve_name2=$(echo $task_name | cut -d'_' -f3)  
 
 case_temp0_out_dir="${ROOT_DIR}/temp0/${task_name}"
 case_temp0_log_dir="${ROOT_DIR}/temp0/${task_name}_log"
@@ -30,13 +29,13 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1" \
     --log_dir "$case_temp0_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "meta-llama/Llama-2-7b" \
-    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+    --model_name_or_path "./llama2-7b" \
+    --tokenizer_name_or_path "./llama2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 2 \
     --output_dir "$case_temp0_out_dir" \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
@@ -73,15 +72,12 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    # --sharding_parallel_degree 2 \
-    # --sharding "stage1" \
-    # --sharding_parallel_config "split_param" \
 
 
 export FLAGS_shard_bypass_dygraph_optimizer=1
 
 
-# 从转换前训练load
+# 从转换前训练load to dp4
 case_temp1_out_dir="${ROOT_DIR}/temp1/${task_name}"
 case_temp1_log_dir="${ROOT_DIR}/temp1/${task_name}_log"
 
@@ -89,21 +85,21 @@ case_temp1_log_dir="${ROOT_DIR}/temp1/${task_name}_log"
 rm -rf $case_temp1_out_dir
 rm -rf $case_temp1_log_dir
 
-
+# load 
 python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "$case_temp1_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "meta-llama/Llama-2-7b" \
-    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+    --model_name_or_path "./llama2-7b" \
+    --tokenizer_name_or_path "./llama2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 2 \
     --output_dir "$case_temp1_out_dir" \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
-    --tensor_parallel_degree 1 \
+    --tensor_parallel_degree 4 \
     --pipeline_parallel_degree 1 \
     --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity" \
     --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv enable_overlap_p2p_comm" \
@@ -138,10 +134,14 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
     --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-5" \
-    --sharding_parallel_degree 4 \
-    --sharding "stage1" \
-    # --sharding_parallel_config "split_param" \
-
+    --aoa_config '{ 
+    "aoa_statements": [
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment1_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment1_0, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment2_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment2_0, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.w_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.w_0, fused_ffn"
+    ]
+    }' \
 
 # load回
 case_temp2_out_dir="${ROOT_DIR}/temp2/${task_name}"
@@ -151,17 +151,18 @@ case_temp2_log_dir="${ROOT_DIR}/temp2/${task_name}_log"
 rm -rf $case_temp2_out_dir
 rm -rf $case_temp2_log_dir
 
+
 python -u -m paddle.distributed.launch \
     --gpus "0,1" \
     --log_dir "$case_temp2_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "meta-llama/Llama-2-7b" \
-    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+    --model_name_or_path "./llama2-7b" \
+    --tokenizer_name_or_path "./llama2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 2 \
     --output_dir "$case_temp2_out_dir" \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
@@ -198,12 +199,17 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_qkv true \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
-    --resume_from_checkpoint "${case_temp1_out_dir}/checkpoint-6"
-    # --sharding_parallel_degree 2 \
-    # --sharding "stage1" \
-    # --sharding_parallel_config "split_param" \
+    --resume_from_checkpoint "${case_temp1_out_dir}/checkpoint-6" \
+    --aoa_config '{ 
+    "aoa_statements": [
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment1_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment1_0, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment2_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment2_0, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.w_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.w_0, fused_ffn"
+    ]
+    }' \
 
-#比较转换前，后转换回来的ckpt的md5是否完全一致，若完全一致，则会输出：MD5匹配通过
+#比较转换前，后转换回来的tp2的ckpt的md5是否完全一致，若完全一致，则会输出：MD5匹配通过
 python -m compare_checkpoints temp2/${task_name}/checkpoint-7 temp0/${task_name}/checkpoint-5
 
 
@@ -224,16 +230,16 @@ python -u -m paddle.distributed.launch \
     --gpus "0,1,2,3" \
     --log_dir "$case_temp3_log_dir" \
     run_pretrain.py \
-    --model_name_or_path "meta-llama/Llama-2-7b" \
-    --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
+    --model_name_or_path "./llama2-7b" \
+    --tokenizer_name_or_path "./llama2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 2 \
     --output_dir "$case_temp3_out_dir" \
     --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
-    --tensor_parallel_degree 1 \
+    --tensor_parallel_degree 4 \
     --pipeline_parallel_degree 1 \
     --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity" \
     --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv enable_overlap_p2p_comm" \
@@ -268,9 +274,14 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
     --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-5" \
-    --sharding_parallel_degree 4 \
-    --sharding "stage1" \
-    # --sharding_parallel_config "split_param" \
+    --aoa_config '{ 
+    "aoa_statements": [
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment1_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment1_0, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment2_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.moment2_0, fused_ffn",
+        "llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.w_0 -> llama.layers.$LAYER_ID.mlp.gate_up_fused_proj.weight.w_0, fused_ffn"
+    ]
+    }' \
 
 # 计算续训的 loss diff 精度误差
 python -m coculate_loss_with_md5 ${case_temp0_log_dir}/workerlog.0 ${case_temp3_log_dir}/workerlog.0 

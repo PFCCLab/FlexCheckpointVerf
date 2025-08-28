@@ -13,7 +13,7 @@ export FLAGS_embedding_deterministic=1
 ROOT_DIR="/home/aistudio/PaddleNLP/llm"
 
 # 转换前训练
-task_name="Sharding2_to_Sharding4"
+task_name="Sharding2_V1_to_VPP4"
 # 从task_name中提取TP2和TP4作为曲线名称
 curve_name1=$(echo $task_name | cut -d'_' -f1)  # 提取TP2
 curve_name2=$(echo $task_name | cut -d'_' -f3)  # 提取TP4
@@ -34,9 +34,9 @@ python -u -m paddle.distributed.launch \
     --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 8 \
     --output_dir "$case_temp0_out_dir" \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
@@ -97,16 +97,16 @@ python -u -m paddle.distributed.launch \
     --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 8 \
     --output_dir "$case_temp1_out_dir" \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
-    --pipeline_parallel_degree 1 \
+    --pipeline_parallel_degree 4 \
     --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity" \
     --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv enable_overlap_p2p_comm" \
-    --virtual_pp_degree 1 \
+    --virtual_pp_degree 2 \
     --sequence_parallel 0 \
     --use_flash_attention 0 \
     --use_fused_rms_norm 0 \
@@ -137,8 +137,8 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
     --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-5" \
-    --sharding_parallel_degree 4 \
-    --sharding "stage1" \
+    # --sharding_parallel_degree 4 \
+    # --sharding "stage1" \
     # --sharding_parallel_config "split_param" \
 
 
@@ -158,9 +158,9 @@ python -u -m paddle.distributed.launch \
     --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 8 \
     --output_dir "$case_temp2_out_dir" \
-    --per_device_train_batch_size 2 \
+    --per_device_train_batch_size 1 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
@@ -226,16 +226,16 @@ python -u -m paddle.distributed.launch \
     --tokenizer_name_or_path "meta-llama/Llama-2-7b" \
     --input_dir "./data" \
     --split "949,50,1" \
-    --num_hidden_layers 4 \
+    --num_hidden_layers 8 \
     --output_dir "$case_temp3_out_dir" \
-    --per_device_train_batch_size 1 \
+    --per_device_train_batch_size 2 \
     --gradient_accumulation_steps 8 \
     --per_device_eval_batch_size 8 \
     --tensor_parallel_degree 1 \
-    --pipeline_parallel_degree 1 \
+    --pipeline_parallel_degree 4 \
     --tensor_parallel_config "enable_delay_scale_loss enable_mp_async_allreduce enable_mp_skip_c_identity" \
     --pipeline_parallel_config "enable_delay_scale_loss enable_release_grads disable_partial_send_recv enable_overlap_p2p_comm" \
-    --virtual_pp_degree 1 \
+    --virtual_pp_degree 2 \
     --sequence_parallel 0 \
     --use_flash_attention 0 \
     --use_fused_rms_norm 0 \
@@ -266,8 +266,8 @@ python -u -m paddle.distributed.launch \
     --fuse_attention_ffn true \
     --unified_checkpoint 0 \
     --resume_from_checkpoint "${case_temp0_out_dir}/checkpoint-5" \
-    --sharding_parallel_degree 4 \
-    --sharding "stage1" \
+    # --sharding_parallel_degree 4 \
+    # --sharding "stage1" \
     # --sharding_parallel_config "split_param" \
 
 # 计算续训的 loss diff 精度误差
